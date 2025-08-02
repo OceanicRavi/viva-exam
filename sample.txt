@@ -1,0 +1,9 @@
+Introduction to Photosynthesis
+
+Photosynthesis is a process used by plants, algae, and some bacteria to convert light energy into chemical energy. It takes place primarily in the chloroplasts of plant cells. The basic equation for photosynthesis is:
+
+6CO2 + 6H2O + light energy → C6H12O6 + 6O2
+
+This means carbon dioxide and water are converted into glucose and oxygen using light. Chlorophyll, the green pigment in leaves, absorbs light most efficiently in the blue and red wavelengths.
+
+Photosynthesis is important because it provides the oxygen we breathe and the glucose plants use for energy and growth.
