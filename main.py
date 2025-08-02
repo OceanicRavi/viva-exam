@@ -9,7 +9,8 @@ load_dotenv()
 # Set your OpenAI API key here
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Initialize TTS engine globally
+# ========== AUDIO FUNCTIONS ==========
+
 engine = pyttsx3.init()
 
 def speak(text):
@@ -18,108 +19,93 @@ def speak(text):
     engine.runAndWait()
 
 def listen():
-    recognizer = sr.Recognizer()
+    r = sr.Recognizer()
     with sr.Microphone() as source:
         print("🎤 Listening...")
-        recognizer.adjust_for_ambient_noise(source)
         try:
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=20)
+            audio = r.listen(source, timeout=5)
+            response = r.recognize_google(audio)
+            print(f"🗣️ You said: {response}")
+            return response
+        except sr.UnknownValueError:
+            print("❌ Could not understand audio.")
+            speak("Sorry, I could not understand. Try again.")
+            return None
         except sr.WaitTimeoutError:
-            print("⏱️ No speech detected. Please try again.")
-            return ""
-    try:
-        response = recognizer.recognize_google(audio)
-        print(f"🗣️ You said: {response}")
-        return response
-    except sr.UnknownValueError:
-        print("🤖 Could not understand. Please try again.")
-        return ""
-    except sr.RequestError as e:
-        print(f"⚠️ Speech recognition error: {e}")
-        return ""
+            print("⏰ Timeout.")
+            speak("No response detected. Try again.")
+            return None
 
-def extract_text_from_pdf(pdf_path):
-    with open(pdf_path, 'rb') as f:
-        reader = PyPDF2.PdfReader(f)
-        return "\n".join([page.extract_text() or "" for page in reader.pages])
+# ========== FILE LOADING ==========
 
-def load_text_file(txt_path):
-    with open(txt_path, 'r', encoding='utf-8') as f:
-        return f.read()
+def load_file_text(filepath):
+    if filepath.endswith(".pdf"):
+        import PyPDF2
+        with open(filepath, "rb") as f:
+            reader = PyPDF2.PdfReader(f)
+            return " ".join([page.extract_text() for page in reader.pages])
+    elif filepath.endswith(".txt"):
+        with open(filepath, "r", encoding="utf-8") as f:
+            return f.read()
+    else:
+        raise ValueError("Unsupported file format. Use PDF or TXT.")
 
-def generate_questions(content: str) -> str:
-    response = client.chat.completions.create(
-        model="gpt-4",  # or "gpt-3.5-turbo"
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that generates viva questions."},
-            {"role": "user", "content": f"Generate viva questions from the following content:\n\n{content}"}
-        ],
-        temperature=0.7
-    )
-    return response.choices[0].message.content.strip()
+# ========== AI FUNCTIONS ==========
 
-def score_answer(question, answer):
+def generate_questions(text, count):
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "You are a strict examiner evaluating a student's answer."},
-            {"role": "user", "content": f"Question: {question}\nStudent's Answer: {answer}\nGive feedback and a score out of 10."}
+            {"role": "system", "content": "You're an examiner generating oral viva questions."},
+            {"role": "user", "content": f"Generate {count} short viva-style questions based on this content:\n{text}"}
+        ]
+    )
+    return response.choices[0].message.content.split('\n')
+
+def score_answer(question, answer):
+    prompt = f"This is a viva question: '{question}'. The student answered: '{answer}'. Give gentle, encouraging feedback. If correct, say it's good. If incorrect, explain simply."
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You're a friendly and encouraging teacher."},
+            {"role": "user", "content": prompt}
         ]
     )
     return response.choices[0].message.content
 
-
-def extract_score(feedback):
-    for part in feedback.split():
-        if "/" in part:
-            try:
-                return int(part.split("/")[0])
-            except:
-                continue
-    return 0
+# ========== MAIN LOGIC ==========
 
 def main():
-    path = input("📄 Enter path to PDF or TXT file: ").strip()
+    filepath = input("📄 Enter path to PDF or TXT file: ").strip()
+    text = load_file_text(filepath)
 
-    if not os.path.exists(path):
-        print("❌ File not found.")
-        return
+    try:
+        question_count = int(input("❓ How many questions to generate? "))
+    except ValueError:
+        question_count = 3
+        print("⚠️ Invalid number, defaulting to 3 questions.")
 
-    if path.lower().endswith('.pdf'):
-        content = extract_text_from_pdf(path)
-    elif path.lower().endswith('.txt'):
-        content = load_text_file(path)
-    else:
-        print("⚠️ Only .pdf or .txt formats are supported.")
-        return
+    print("\n🤖 Generating viva questions...\n")
+    questions = generate_questions(text, question_count)
 
-    print("\n🤖 Generating viva questions...")
-    questions_raw = generate_questions(content)
-    questions = [line for line in questions_raw.split('\n') if line.strip() and ("?" in line or line.strip()[0].isdigit())]
+    for i, q in enumerate(questions, 1):
+        if not q.strip(): continue  # skip blanks
+        print(f"❓ {i}. {q}")
+        speak(f"Question {i}. {q}")
 
-    if not questions:
-        print("❌ Could not generate questions.")
-        return
+        attempts = 0
+        user_answer = None
+        while attempts < 3 and user_answer is None:
+            user_answer = listen()
+            attempts += 1
 
-    total_score = 0
+        if user_answer:
+            feedback = score_answer(q, user_answer)
+        else:
+            feedback = "Let's skip this one and move to the next question."
 
-    for q in questions:
-        print("\n❓", q)
-        speak(q)
-        user_answer = listen()
-        if not user_answer:
-            speak("Skipping this question.")
-            continue
-
-        feedback = score_answer(q, user_answer)
-        print("📊 Feedback:", feedback)
         speak(feedback)
-
-        score = extract_score(feedback)
-        total_score += score
-
-    print(f"\n✅ Final Score: {total_score} / {len(questions) * 2}")
-    speak(f"Your final score is {total_score} out of {len(questions) * 2}")
+        print()
 
 if __name__ == "__main__":
     main()
