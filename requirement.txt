@@ -3,3 +3,4 @@ PyPDF2
 speechrecognition
 pyttsx3
 pyaudio
+python-dotenv
