@@ -155,23 +155,63 @@ def generate_questions(content, count):
         print(f"Question generation error: {e}")
         return []
 
-def get_feedback(question, answer):
-    """Get encouraging feedback"""
+def get_feedback_and_score(question, answer):
+    """Get detailed feedback with correct answer and scoring"""
     if not answer:
-        return "No problem! Let's continue."
+        return "That's okay! Moving on.", 0
     
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Give brief, encouraging feedback in 15 words or less. Always be positive."},
-                {"role": "user", "content": f"Q: {question}\nA: {answer}"}
+                {
+                    "role": "system", 
+                    "content": """You are an encouraging teacher. Evaluate the student's answer and respond with:
+                    1. Whether it's correct, partially correct, or incorrect (be gentle)
+                    2. If wrong/incomplete, provide the correct answer briefly
+                    3. Always end on a positive, encouraging note
+                    4. Keep response under 40 words
+                    5. Never be harsh or demotivating"""
+                },
+                {
+                    "role": "user", 
+                    "content": f"Question: {question}\nStudent Answer: {answer}\n\nEvaluate this answer and provide gentle feedback with the correct information if needed."
+                }
             ],
-            max_tokens=40
+            max_tokens=100,
+            temperature=0.3
         )
-        return response.choices[0].message.content.strip()
-    except:
-        return "Good job! Well done."
+        
+        feedback = response.choices[0].message.content.strip()
+        
+        # Simple scoring based on keywords in feedback
+        feedback_lower = feedback.lower()
+        if any(word in feedback_lower for word in ['correct', 'right', 'good', 'excellent', 'perfect']):
+            score = 1
+        elif any(word in feedback_lower for word in ['partially', 'somewhat', 'close', 'almost']):
+            score = 0.5
+        else:
+            score = 0
+            
+        return feedback, score
+        
+    except Exception as e:
+        return "Good effort! Keep going.", 0.5
+
+def calculate_grade(percentage):
+    """Convert percentage to letter grade"""
+    if percentage >= 90:
+        return "A+ Excellent"
+    elif percentage >= 80:
+        return "A Good"
+    elif percentage >= 70:
+        return "B+ Well done"
+    elif percentage >= 60:
+        return "B Nice effort"
+    elif percentage >= 50:
+        return "C+ Keep improving"
+    else:
+        return "C Good try"
 
 def main():
     """Main program"""
@@ -199,7 +239,7 @@ def main():
     except:
         count = 3
     
-    speak_text(f"I will ask {count} questions. Let's start!")
+    speak_text(f"I will ask {count} questions. Remember, this is about learning! Let's start!")
     
     # Generate questions
     questions = generate_questions(content, count)
@@ -209,7 +249,10 @@ def main():
     
     time.sleep(1)
     
-    # Ask questions
+    # Ask questions and track score
+    total_score = 0
+    max_score = len(questions)
+    
     for i, question in enumerate(questions, 1):
         print(f"\n{'='*40}")
         print(f"QUESTION {i}")
@@ -222,16 +265,34 @@ def main():
         # Get answer
         answer = get_audio_input()
         
+        # Get detailed feedback and score
+        feedback, question_score = get_feedback_and_score(question, answer)
+        total_score += question_score
+        
         # Give feedback
-        feedback = get_feedback(question, answer)
         speak_text(feedback)
         
         # Pause between questions
         time.sleep(1.5)
     
-    # Finish
+    # Calculate final results
+    percentage = (total_score / max_score) * 100
+    grade = calculate_grade(percentage)
+    
+    # Final results
     print("\n🎉 EXAM COMPLETED!")
-    speak_text("Great job! You completed all questions. Well done!")
+    print(f"📊 FINAL SCORE: {total_score:.1f}/{max_score} ({percentage:.0f}%)")
+    print(f"🏆 GRADE: {grade}")
+    
+    # Verbal final score with encouragement
+    if percentage >= 80:
+        final_message = f"Fantastic! You scored {percentage:.0f} percent. Grade {grade}. You really know your material!"
+    elif percentage >= 60:
+        final_message = f"Well done! You scored {percentage:.0f} percent. Grade {grade}. You're doing great, keep studying!"
+    else:
+        final_message = f"Good effort! You scored {percentage:.0f} percent. Grade {grade}. Keep practicing and you'll improve!"
+    
+    speak_text(final_message)
 
 if __name__ == "__main__":
     main()
