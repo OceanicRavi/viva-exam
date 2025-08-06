@@ -144,3 +144,5 @@ Good luck with your viva exam! 🌟
 
 ----------------------------
 pip list | findstr /i "openai PyPDF2 SpeechRecognition pyttsx3 pyaudio python-dotenv"
+
+pip install openai==1.3.8 pyttsx3==2.90 pyaudio==0.2.11 SpeechRecognition==3.10.0 python-dotenv==1.0.0 --force-reinstall
