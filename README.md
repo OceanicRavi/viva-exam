@@ -143,10 +143,4 @@ You're ready to use the Viva Exam system! Remember:
 Good luck with your viva exam! 🌟
 
 ----------------------------
-pip uninstall openai PyPDF2 speechrecognition pyttsx3 pyaudio python-dotenv
-
-pip install -r requirement.txt
-
-pip uninstall pyaudio
-pip install pipwin
-pipwin install pyaudio==0.2.11
+pip list | findstr /i "openai PyPDF2 SpeechRecognition pyttsx3 pyaudio python-dotenv"
