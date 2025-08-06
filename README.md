@@ -141,3 +141,12 @@ You're ready to use the Viva Exam system! Remember:
 - **Have fun** with your studies!
 
 Good luck with your viva exam! 🌟
+
+----------------------------
+pip uninstall openai PyPDF2 speechrecognition pyttsx3 pyaudio python-dotenv
+
+pip install -r requirements.txt
+
+pip uninstall pyaudio
+pip install pipwin
+pipwin install pyaudio==0.2.11
